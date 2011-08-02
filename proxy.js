@@ -151,6 +151,7 @@ function server_cb(request, response) {
     }
 
     var surl = url.parse(newurl);
+    /*
     var proxy = http.createClient(surl.port || 80, surl.hostname);
     var proxy_request = proxy.request(request.method, newurl, request.headers);
 
@@ -176,6 +177,42 @@ function server_cb(request, response) {
     });
     request.addListener('end', function() {
         proxy_request.end();
+    });
+    */
+
+    var options = { 
+            method: request.method,
+            host: surl.hostname,
+            port: surl.port,
+            path: surl.pathname + (surl.search ? '?' + surl.search : ''),
+    };
+
+    var proxy = http.request(options, function(proxy_response) {
+        history_obj.timestamp = microtime();
+        history_obj.status_code = proxy_response.statusCode;
+        history_obj.response_headers = proxy_response.headers;
+        sys.log(newurl + " Response = " + proxy_response.statusCode + " Headers=" + JSON.stringify(proxy_response.headers));
+
+        update_listeners([history_obj]);
+
+        response.writeHead(proxy_response.statusCode, proxy_response.headers);
+
+        proxy_response.on('data', function (chunk) {
+            response.write(chunk, 'binary');
+        });
+        proxy_response.on('end', function () {
+            response.end();
+        });
+    });
+
+    proxy.on('error', function (e) {
+        sys.log("ERROR: " + surl + " error=" + e.message);
+    });
+    request.addListener('data', function(chunk) {
+        proxy.write(chunk, 'binary');
+    });
+    request.addListener('end', function() {
+        proxy.end();
     });
 
     update_listeners([history_obj]);
