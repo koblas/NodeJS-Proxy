@@ -225,6 +225,8 @@ function server_cb(request, response) {
 function send_file(request, response, filename) {
   var fullpath = path.join(process.cwd(), filename);
 
+  sys.log("Static = " + filename);
+
   path.exists(fullpath, function(exists) {
     if (!exists) {
         response.writeHead(404, {"Content-Type" : "text/plain"});
@@ -298,6 +300,8 @@ function dashboard_router(request, response) {
     var routes = {
         "/" : function() { send_file(request, response, "static/index.html"); },
         "/client.js" : function() { send_file(request, response, "static/client.js"); },
+        "/DevTools.css" : function() { send_file(request, response, "static/devTools.css"); },
+        "/DevTools.js" : function() { send_file(request, response, "static/devTools.js"); },
         "/update" : dashboard_update,
         "/join" : handle_join,
         "/recv" : handle_recv,
@@ -306,10 +310,16 @@ function dashboard_router(request, response) {
 
     sys.log(ip + " : LOCAL " + request.url);
 
-    var   f = routes[surl.pathname];
+    var f = null;
+
+    if (surl.pathname.match(/\/Images/)) {
+        f = function() { send_file(request, response, "static" + surl.pathname); }
+    } else {
+        f = routes[surl.pathname];
+    }
 
     if (f)
-        return f(request,response);
+        return f(request, response);
 
     msg = "Not found";
     deny(response, msg);
