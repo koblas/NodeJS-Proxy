@@ -21352,6 +21352,7 @@ this.crumbsElement.addEventListener("mousemove", this._mouseMovedInCrumbs.bind(t
 this.crumbsElement.addEventListener("mouseout", this._mouseMovedOutOfCrumbs.bind(this), false);
 
 this.sidebarPanes = {};
+/*
 this.sidebarPanes.computedStyle = new WebInspector.ComputedStyleSidebarPane();
 this.sidebarPanes.styles = new WebInspector.StylesSidebarPane(this.sidebarPanes.computedStyle);
 this.sidebarPanes.metrics = new WebInspector.MetricsSidebarPane();
@@ -21374,6 +21375,7 @@ WebInspector.cssModel.addEventListener(WebInspector.CSSStyleModel.Events.StyleSh
 
 this.sidebarElement = document.createElement("div");
 this.sidebarElement.id = "elements-sidebar";
+*/
 
 for (var pane in this.sidebarPanes)
 this.sidebarElement.appendChild(this.sidebarPanes[pane].element);
