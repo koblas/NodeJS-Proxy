@@ -261,6 +261,8 @@ function dashboard_router(request, response) {
     var routes = {
         "/" : function() { send_file(request, response, "static/index.html"); },
         "/client.js" : function() { send_file(request, response, "static/client.js"); },
+        "/DevTools.css" : function() { send_file(request, response, "static/devTools.css"); },
+        "/DevTools.js" : function() { send_file(request, response, "static/devTools.js"); },
         "/update" : dashboard_update,
         "/join" : handle_join,
         "/recv" : handle_recv,
