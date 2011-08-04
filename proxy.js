@@ -141,12 +141,25 @@ function server_cb(request, response) {
 
     var newurl = rewrite(request.url);
 
+    if (newurl == 500) {
+        setTimeout(1500, function () {
+            response.writeHead(newurl, {
+                'Content-Type': 'text/plain',
+                'Pragma': 'no-cache'
+            });
+            response.write('500 error', 'binary');
+            response.end();
+        });
+        return;
+    }
+
     if (newurl) {
         history_obj.proxy = 'PROXY';
         sys.log(ip + ": PROXY " + request.method + " " + request.url + " => " + newurl);
     } else {
         history_obj.proxy = 'PASS';
-        sys.log(ip + ": PASS " + request.method + " " + request.url);
+        if (verbose == 1)
+            sys.log(ip + ": PASS " + request.method + " " + request.url);
         newurl = request.url;
     }
 
@@ -184,14 +197,16 @@ function server_cb(request, response) {
             method: request.method,
             host: surl.hostname,
             port: surl.port,
-            path: surl.pathname + (surl.search ? '?' + surl.search : ''),
+            path: surl.pathname + (surl.search ? surl.search : ''),
+            headers : request.headers,
     };
 
     var proxy = http.request(options, function(proxy_response) {
         history_obj.timestamp = microtime();
         history_obj.status_code = proxy_response.statusCode;
         history_obj.response_headers = proxy_response.headers;
-        sys.log(newurl + " Response = " + proxy_response.statusCode + " Headers=" + JSON.stringify(proxy_response.headers));
+        if (history_obj.proxy == 'PROXY' || verbose == 1)
+            sys.log(newurl + " Response = " + proxy_response.statusCode + " Headers=" + JSON.stringify(proxy_response.headers));
 
         update_listeners([history_obj]);
 
@@ -206,7 +221,8 @@ function server_cb(request, response) {
     });
 
     proxy.on('error', function (e) {
-        sys.log("ERROR: " + surl + " error=" + e.message);
+        sys.log("ERROR: " + url.format(surl) + " error=" + e.message);
+        response.end();
     });
     request.addListener('data', function(chunk) {
         proxy.write(chunk, 'binary');
