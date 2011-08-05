@@ -15,7 +15,9 @@ var getopt  = require('./lib/getopt');
 var path    = require('path');
 var mime    = require('./lib/mime');
 var config  = require('./config').config;
-var rewrite = require('./lib/rewrite').rewrite;
+var rewrite_module = require('./lib/rewrite');
+
+var rewrite = rewrite_module.rewrite;
 
 var blacklist = [];
 var iplist    = [];
@@ -258,6 +260,34 @@ function handle_part(request, response) {
     response.end();
 }
 
+/* Set PROXY */
+function handle_set(request, response) {
+    var parts = url.parse(request.url, true);
+
+    var msg = [
+        {
+            op : 'attr',
+            selector : 'li a',
+            attr : { 'class' : '' }
+        }, {
+            op : 'attr',
+            selector : '#proxy_' + parts.query['proxy'],
+            attr : { 'class' : 'active' }
+        }
+    ];
+
+    response.writeHead(200, {"Content-Type" : "application/json" });
+
+    if (!rewrite_module.rewrite_set(parts.query['proxy'])) {
+        response.write(JSON.stringify({ actions : [] }), "binary");
+    } else {
+        response.write(JSON.stringify({ actions : msg }), "binary");
+    }
+
+    response.end();
+    return false;
+}
+
 /* PROCESS MESSAGE */
 function handle_recv(request, response) {
     var surl = url.parse(request.url, true);
@@ -290,13 +320,13 @@ function dashboard_router(request, response) {
 
     var routes = {
         "/" : function() { send_file(request, response, "static/index.html"); },
-        "/client.js" : function() { send_file(request, response, "static/client.js"); },
         "/DevTools.css" : function() { send_file(request, response, "static/devTools.css"); },
         "/DevTools.js" : function() { send_file(request, response, "static/devTools.js"); },
         "/update" : dashboard_update,
         "/join" : handle_join,
         "/recv" : handle_recv,
         "/part" : handle_part,
+        "/set" : handle_set,
     };
 
     sys.log(ip + " : LOCAL " + request.url);
@@ -305,6 +335,8 @@ function dashboard_router(request, response) {
 
     if (surl.pathname.match(/\/Images/)) {
         f = function() { send_file(request, response, "static" + surl.pathname); }
+    } else if (surl.pathname.match(/^\/static\//)) {
+        f = function() { send_file(request, response, surl.pathname); }
     } else {
         f = routes[surl.pathname];
     }
