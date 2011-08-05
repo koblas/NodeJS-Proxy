@@ -139,99 +139,74 @@ function server_cb(request, response) {
         return;
     }
 
-    var newurl = rewrite(request.url);
-
-    if (newurl == 500) {
-        setTimeout(1500, function () {
+    var newurl = rewrite(request.url, request, function(newurl) {
+        if (typeof newurl == "number") {
             response.writeHead(newurl, {
                 'Content-Type': 'text/plain',
                 'Pragma': 'no-cache'
             });
-            response.write('500 error', 'binary');
+            response.write(newurl + ' error', 'binary');
+            response.end();
+            return;
+        }
+        if (typeof newurl == "object") {
+            return;
+        }
+        if (typeof newurl == "function") {
+            return;
+        }
+
+        if (newurl) {
+            history_obj.proxy = 'PROXY';
+            sys.log(ip + ": PROXY " + request.method + " " + request.url + " => " + newurl);
+        } else {
+            history_obj.proxy = 'PASS';
+            if (verbose == 1)
+                sys.log(ip + ": PASS " + request.method + " " + request.url);
+            newurl = request.url;
+        }
+
+        var surl = url.parse(newurl);
+        var options = {
+                method: request.method,
+                host: surl.hostname,
+                port: surl.port,
+                path: surl.pathname + (surl.search ? surl.search : ''),
+                headers : request.headers,
+        };
+
+        var proxy = http.request(options, function(proxy_response) {
+            history_obj.timestamp = microtime();
+            history_obj.status_code = proxy_response.statusCode;
+            history_obj.response_headers = proxy_response.headers;
+            if (history_obj.proxy == 'PROXY' || verbose == 1)
+                sys.log(newurl + " Response = " + proxy_response.statusCode + " Headers=" + JSON.stringify(proxy_response.headers));
+
+            update_listeners([history_obj]);
+
+            response.writeHead(proxy_response.statusCode, proxy_response.headers);
+
+            proxy_response.on('data', function (chunk) {
+                response.write(chunk, 'binary');
+            });
+            proxy_response.on('end', function () {
+                response.end();
+            });
+        });
+
+        proxy.on('error', function (e) {
+            sys.log("ERROR: " + url.format(surl) + " error=" + e.message);
             response.end();
         });
-        return;
-    }
-
-    if (newurl) {
-        history_obj.proxy = 'PROXY';
-        sys.log(ip + ": PROXY " + request.method + " " + request.url + " => " + newurl);
-    } else {
-        history_obj.proxy = 'PASS';
-        if (verbose == 1)
-            sys.log(ip + ": PASS " + request.method + " " + request.url);
-        newurl = request.url;
-    }
-
-    var surl = url.parse(newurl);
-    /*
-    var proxy = http.createClient(surl.port || 80, surl.hostname);
-    var proxy_request = proxy.request(request.method, newurl, request.headers);
-
-    proxy_request.addListener('response', function(proxy_response) {
-        proxy_response.addListener('data', function(chunk) {
-            response.write(chunk, 'binary');
+        request.addListener('data', function(chunk) {
+            proxy.write(chunk, 'binary');
         });
-        proxy_response.addListener('end', function() {
-            response.end();
+        request.addListener('end', function() {
+            proxy.end();
         });
-
-        history_obj.timestamp = microtime();
-        history_obj.status_code = proxy_response.statusCode;
-        history_obj.response_headers = proxy_response.headers;
-        sys.log(newurl + " Response = " + proxy_response.statusCode + " Headers=" + JSON.stringify(proxy_response.headers));
 
         update_listeners([history_obj]);
-
-        response.writeHead(proxy_response.statusCode, proxy_response.headers);
     });
-    request.addListener('data', function(chunk) {
-        proxy_request.write(chunk, 'binary');
-    });
-    request.addListener('end', function() {
-        proxy_request.end();
-    });
-    */
-
-    var options = { 
-            method: request.method,
-            host: surl.hostname,
-            port: surl.port,
-            path: surl.pathname + (surl.search ? surl.search : ''),
-            headers : request.headers,
-    };
-
-    var proxy = http.request(options, function(proxy_response) {
-        history_obj.timestamp = microtime();
-        history_obj.status_code = proxy_response.statusCode;
-        history_obj.response_headers = proxy_response.headers;
-        if (history_obj.proxy == 'PROXY' || verbose == 1)
-            sys.log(newurl + " Response = " + proxy_response.statusCode + " Headers=" + JSON.stringify(proxy_response.headers));
-
-        update_listeners([history_obj]);
-
-        response.writeHead(proxy_response.statusCode, proxy_response.headers);
-
-        proxy_response.on('data', function (chunk) {
-            response.write(chunk, 'binary');
-        });
-        proxy_response.on('end', function () {
-            response.end();
-        });
-    });
-
-    proxy.on('error', function (e) {
-        sys.log("ERROR: " + url.format(surl) + " error=" + e.message);
-        response.end();
-    });
-    request.addListener('data', function(chunk) {
-        proxy.write(chunk, 'binary');
-    });
-    request.addListener('end', function() {
-        proxy.end();
-    });
-
-    update_listeners([history_obj]);
 }
 
 /*
